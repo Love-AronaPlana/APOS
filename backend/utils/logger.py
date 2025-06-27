@@ -54,8 +54,6 @@ def setup_logger():
     
     # 添加处理器
     logger.addHandler(console_handler)
-    
-    print("📝 日志系统初始化完成")
 
 def get_logger(name):
     """获取日志器"""

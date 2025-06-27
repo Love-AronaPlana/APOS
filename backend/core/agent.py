@@ -31,25 +31,32 @@ class APOSAgent:
             # 添加用户消息到历史记录
             self.history_manager.add_message(session_id, 'user', user_message)
             
-            # 获取历史记录
-            history = self.history_manager.get_history(session_id)
-            
             # 构建系统提示词
             system_prompt = self._build_system_prompt()
             
             # 开始对话循环
-            max_iterations = 10  # 最大迭代次数
+            max_iterations = 20  # 最大迭代次数
             iteration = 0
+            final_response = None
             
             while iteration < max_iterations:
                 iteration += 1
                 self.logger.info(f"🔄 第 {iteration} 次迭代")
+                
+                # 获取历史记录
+                history = self.history_manager.get_history(session_id)
                 
                 # 调用 LLM
                 response = self.llm_client.chat(system_prompt, history)
                 
                 # 添加助手响应到历史记录
                 self.history_manager.add_message(session_id, 'assistant', response)
+                
+                # 检查是否任务完成
+                if self._is_task_completed(response):
+                    self.logger.info("✅ 任务完成")
+                    final_response = self._extract_final_answer(response)
+                    break
                 
                 # 检查是否需要调用工具
                 tool_call = self._extract_tool_call(response)
@@ -73,19 +80,21 @@ class APOSAgent:
                     # 继续下一次迭代
                     continue
                 
-                # 检查是否任务完成
-                if self._is_task_completed(response):
-                    self.logger.info("✅ 任务完成")
-                    break
+                # 如果没有工具调用，也没有最终答案，则直接跳出
+                self.logger.warning("🤔 未检测到工具调用或最终答案，提前结束任务。")
+                final_response = response # 将当前响应作为最终响应
+                break
             
-            # 获取最终响应
-            final_response = self.history_manager.get_last_assistant_message(session_id)
+            # 如果循环结束后没有最终响应，则获取最后一条助手消息
+            if final_response is None:
+                self.logger.warning("🤔 达到最大迭代次数，但未找到最终答案。")
+                final_response = self.history_manager.get_last_assistant_message(session_id)
             
             return {
                 'response': final_response,
                 'session_id': session_id,
                 'iterations': iteration,
-                'status': 'completed' if iteration < max_iterations else 'max_iterations_reached'
+                'status': 'completed' if final_response and iteration < max_iterations else 'max_iterations_reached'
             }
             
         except Exception as e:
@@ -121,14 +130,21 @@ class APOSAgent:
 }}
 </tool_call>
 
+任务完成格式：
+当你已经完成所有任务，请使用以下 XML 格式提交最终答案：
+<final_answer>
+最终答案
+</final_answer>
+
 可用工具：
 {tools_info}
 
 重要规则：
-- 每次对话只能调用一个工具
-- 必须严格按照 XML 格式调用工具
-- 工具调用后等待执行结果再继续
-- 任务完成后说明"任务已完成"
+- 每次对话只能调用一个工具或提交最终答案。
+- 必须严格按照 XML 格式调用工具或提交最终答案。
+- 工具调用后，我会将执行结果返回给你。请根据结果判断任务是否完成。
+- 如果任务已完成，请使用 <final_answer> 标签提交最终答案。
+- 如果任务未完成，你可以继续调用工具。
 
 请根据用户的需求，逐步使用工具来完成任务。"""
     
@@ -149,20 +165,27 @@ class APOSAgent:
                 return None
         
         return None
+
+    def _extract_final_answer(self, response: str) -> str:
+        """从响应中提取最终答案"""
+        pattern = r'<final_answer>(.*?)</final_answer>'
+        match = re.search(pattern, response, re.DOTALL)
+        
+        if match:
+            final_answer = match.group(1).strip()
+            self.logger.info(f"🔍 提取到最终答案: {final_answer}")
+            return final_answer
+        
+        # 如果没有找到 final_answer 标签，但任务被标记为完成，则直接返回原始响应
+        return response
     
     def _is_task_completed(self, response: str) -> bool:
-        """检查任务是否完成"""
-        completion_keywords = [
-            "任务已完成", "任务完成", "完成了", "已完成",
-            "task completed", "finished", "done"
-        ]
-        
-        response_lower = response.lower()
-        for keyword in completion_keywords:
-            if keyword.lower() in response_lower:
-                return True
-        
-        return False
+        """
+        检查任务是否完成。
+
+        如果响应中包含 <final_answer> 标签，则认为任务已完成。
+        """
+        return "<final_answer>" in response
     
     def get_history(self, session_id: str) -> List[Dict[str, Any]]:
         """获取历史记录"""
@@ -175,4 +198,3 @@ class APOSAgent:
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """获取可用工具列表"""
         return self.tool_manager.get_available_tools()
-

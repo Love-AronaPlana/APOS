@@ -69,7 +69,7 @@ MAX_HISTORY_LENGTH=100
 ### 3. 前端部署
 
 ```bash
-cd frontend/apos-frontend
+cd frontend
 
 # 安装依赖
 npm install
@@ -89,7 +89,7 @@ python3 app.py
 #### 启动前端 (终端 2)
 
 ```bash
-cd frontend/apos-frontend
+cd frontend
 npm run dev -- --host
 ```
 
@@ -124,7 +124,7 @@ CMD ["python", "app.py"]
 #### 创建 Dockerfile (前端)
 
 ```dockerfile
-# frontend/apos-frontend/Dockerfile
+# frontend/Dockerfile
 FROM node:20-alpine
 
 WORKDIR /app
@@ -160,7 +160,7 @@ services:
       - ./backend/.env:/app/.env
 
   frontend:
-    build: ./frontend/apos-frontend
+    build: ./frontend
     ports:
       - "80:80"
     depends_on:
@@ -207,7 +207,7 @@ module.exports = {
       name: 'apos-frontend',
       script: 'npm',
       args: 'run preview -- --host --port 3000',
-      cwd: './frontend/apos-frontend',
+      cwd: './frontend',
       env: {
         NODE_ENV: 'production'
       }
@@ -220,7 +220,7 @@ module.exports = {
 
 ```bash
 # 构建前端
-cd frontend/apos-frontend
+cd frontend
 npm run build
 
 # 启动服务
@@ -251,7 +251,7 @@ server {
 
     # 前端静态文件
     location / {
-        root /path/to/APOS/frontend/apos-frontend/dist;
+        root /path/to/APOS/frontend/dist;
         try_files $uri $uri/ /index.html;
     }
 
