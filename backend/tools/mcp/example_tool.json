@@ -1,0 +1,32 @@
+{
+  "name": "example_tool",
+  "description": "这是一个示例 MCP 工具",
+  "version": "1.0.0",
+  "type": "mcp",
+  "parameters": {
+    "input": {
+      "type": "string",
+      "description": "输入参数",
+      "required": true
+    },
+    "option": {
+      "type": "string",
+      "description": "可选参数",
+      "default": "default_value",
+      "required": false
+    }
+  },
+  "endpoint": {
+    "url": "http://localhost:3001/mcp/example",
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "response_format": {
+    "success": "boolean",
+    "result": "any",
+    "error": "string"
+  }
+}
+
