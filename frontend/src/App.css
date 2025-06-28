@@ -182,6 +182,13 @@
 /* 工具卡片悬停效果 */
 .tool-card {
   transition: all 0.2s ease-in-out;
+  max-width: 84%;
+  box-sizing: border-box;
+}
+
+.tool-card .font-medium {
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 .tool-card:hover {

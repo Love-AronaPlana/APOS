@@ -166,7 +166,7 @@ function App() {
                 <ScrollArea className="h-64">
                   <div className="space-y-2">
                     {tools.map((tool, index) => (
-                      <div key={index} className="p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      <div key={index} className="tool-card p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <div className="font-medium text-sm">{tool.name}</div>
                         <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                           {tool.description}
