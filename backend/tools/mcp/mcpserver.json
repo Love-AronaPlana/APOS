@@ -1,7 +1,7 @@
 {
     "mcpServers": {
         "filesystem": {
-            "enabled": true,
+            "enabled": false,
             "command": "npx",
             "args": [
                 "-y",
@@ -11,7 +11,7 @@
             ]
         },
         "playwright": {
-            "enabled": true,
+            "enabled": false,
             "command": "npx",
             "args": [
                 "@playwright/mcp@latest"
