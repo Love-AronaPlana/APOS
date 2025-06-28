@@ -38,39 +38,53 @@ class MCPLoader:
 
                     # 解析MCP服务器配置
                     mcp_servers = config.get("mcpServers", {})
-                    for server_name, server_config in mcp_servers.items():
-                        self.logger.info(f"📡 连接 MCP 服务器: {server_name}")
-
-                        # 创建MCP服务器参数
-                        server_params = StdioServerParameters(
-                            command=server_config.get("command"),
-                            args=server_config.get("args", []),
-                            env=server_config.get("env", {}),
-                        )
-
-                        # 异步连接MCP服务器并获取工具列表
-                        tools = asyncio.run(self._get_mcp_server_tools(server_params))
-
-                        # 注册MCP服务器提供的工具
-                        for tool in tools:
-                            tool_name = f"mcp_{server_name}_{tool.name}"
-                            tool_instance = MCPToolWrapper(
-                                server_params=server_params,
-                                tool_name=tool.name,
-                                description=tool.description,
-                                input_schema=tool.inputSchema,
-                            )
-
-                            self.tool_manager.tools[tool_name] = tool_instance
-                            self.tool_manager.tool_descriptions[tool_name] = (
-                                tool.description
-                            )
-                            self.logger.info(f"✅ 注册 MCP 工具: {tool_name}")
+                    asyncio.run(self._load_all_servers(mcp_servers))
 
                 except Exception as e:
                     self.logger.error(f"❌ 加载 MCP 配置失败 {filename}: {str(e)}")
 
-    async def _get_mcp_server_tools(self, server_params):
+    async def _load_all_servers(self, mcp_servers):
+        """异步加载所有MCP服务器"""
+        tasks = []
+        for server_name, server_config in mcp_servers.items():
+            # 检查是否启用该服务器
+            if not server_config.get('enabled', True):
+                self.logger.info(f"⏭️ 跳过禁用的 MCP 服务器: {server_name}")
+                continue
+            
+            self.logger.info(f"📡 连接 MCP 服务器: {server_name}")
+
+            # 创建MCP服务器参数
+            server_params = StdioServerParameters(
+                command=server_config.get("command"),
+                args=server_config.get("args", []),
+                env=server_config.get("env", {}),
+            )
+            tasks.append(self._get_mcp_server_tools(server_params, server_name))
+
+        # 并行获取所有服务器的工具列表
+        results = await asyncio.gather(*tasks)
+
+        # 处理所有结果并注册工具
+        for result in results:
+            if result:
+                server_name, server_params, tools = result
+                for tool in tools:
+                    tool_name = f"mcp_{server_name}_{tool.name}"
+                    tool_instance = MCPToolWrapper(
+                        server_params=server_params,
+                        tool_name=tool.name,
+                        description=tool.description,
+                        input_schema=tool.inputSchema,
+                    )
+
+                    self.tool_manager.tools[tool_name] = tool_instance
+                    self.tool_manager.tool_descriptions[tool_name] = (
+                        tool.description
+                    )
+                    self.logger.info(f"✅ 注册 MCP 工具: {tool_name}")
+
+    async def _get_mcp_server_tools(self, server_params, server_name):
         """异步获取MCP服务器提供的工具列表"""
         from mcp import ClientSession
         from mcp.client.stdio import stdio_client
@@ -90,11 +104,11 @@ class MCPLoader:
 
                 # 获取工具列表
                 list_tools_response = await session.list_tools()
-                return list_tools_response.tools
+                return (server_name, server_params, list_tools_response.tools)
 
             except Exception as e:
                 self.logger.error(f"❌ 获取 MCP 工具列表失败: {str(e)}")
-                return []
+                return None
 
     def add_mcp_tool(self, config: Dict[str, Any]) -> bool:
         """添加MCP工具"""

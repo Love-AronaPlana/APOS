@@ -1,12 +1,20 @@
 {
     "mcpServers": {
         "filesystem": {
+            "enabled": true,
             "command": "npx",
             "args": [
                 "-y",
                 "@modelcontextprotocol/server-filesystem",
                 "C:\\Users\\Gavin\\Desktop",
                 "E:\\"
+            ]
+        },
+        "playwright": {
+            "enabled": false,
+            "command": "npx",
+            "args": [
+                "@playwright/mcp@latest"
             ]
         }
     }
