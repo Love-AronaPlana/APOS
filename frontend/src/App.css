@@ -182,7 +182,7 @@
 /* 工具卡片悬停效果 */
 .tool-card {
   transition: all 0.2s ease-in-out;
-  max-width: 84%;
+  max-width: 65%;
   box-sizing: border-box;
 }
 

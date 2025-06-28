@@ -11,11 +11,16 @@
             ]
         },
         "playwright": {
-            "enabled": false,
+            "enabled": true,
             "command": "npx",
             "args": [
                 "@playwright/mcp@latest"
             ]
+        },
+        "streamable-http-example": {
+            "enabled": false,
+            "transport": "streamable-http",
+            "url": "http://localhost:8900/mcp"
         }
     }
 }
