@@ -31,7 +31,7 @@ npm --version
 
 ```bash
 # 如果有 Git 仓库
-git clone <repository-url>
+git clone https://github.com/Love-AronaPlana/APOS
 cd APOS
 
 # 或者直接使用现有代码
@@ -151,11 +151,13 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8880:8880"
+      - "${API_PORT}:${API_PORT}"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE=${OPENAI_API_BASE}
       - OPENAI_API_MODEL=${OPENAI_API_MODEL}
+      - API_PORT=${API_PORT}
+      - CORS_ORIGINS=${CORS_ORIGINS}
     volumes:
       - ./backend/.env:/app/.env
 
@@ -200,7 +202,9 @@ module.exports = {
       cwd: './backend',
       interpreter: 'python3',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        API_PORT: 8880,
+        CORS_ORIGINS: 'https://your-domain.com'
       }
     },
     {
@@ -262,6 +266,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    # 如果修改了 API_PORT 环境变量，请将此处的端口号 (8880) 修改为相应的值
     }
 }
 ```
@@ -283,6 +288,7 @@ sudo systemctl reload nginx
 
 ### 必需的环境变量
 
+
 ```env
 # OpenAI API 配置
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -296,7 +302,12 @@ MAX_HISTORY_LENGTH=100
 SECRET_KEY=your-secret-key-here
 ```
 
+### API服务配置说明
+- `API_PORT`: API服务监听端口，默认8880
+- `CORS_ORIGINS`: 允许跨域请求的源地址，多个地址用逗号分隔
+
 ### 可选的环境变量
+
 
 ```env
 # 数据库配置 (如果使用数据库)
@@ -305,8 +316,11 @@ DATABASE_URL=postgresql://user:password@localhost/apos
 # Redis 配置 (如果使用 Redis)
 REDIS_URL=redis://localhost:6379/0
 
+# API 服务配置
+API_PORT=8880                     # API服务监听端口，默认8880
+CORS_ORIGINS=https://your-domain.com  # 允许跨域请求的源地址，多个地址用逗号分隔
+
 # 其他配置
-CORS_ORIGINS=https://your-domain.com
 MAX_WORKERS=4
 ```
 

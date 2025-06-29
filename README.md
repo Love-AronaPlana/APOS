@@ -36,7 +36,7 @@ APOS/
 │   ├── .env.example        # 环境变量示例
 │   └── .env                # 环境变量配置
 ├── frontend/               # 前端应用
-│   └── apos-frontend/      # React 应用
+│   └── frontend/      # React 应用
 │       ├── src/            # 源代码
 │       ├── public/         # 静态资源
 │       └── package.json    # 前端依赖
@@ -66,7 +66,7 @@ APOS 提供了以下内置工具：
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Love-AronaPlana/APOS
 cd APOS
 ```
 
@@ -86,7 +86,7 @@ cp .env.example .env
 ### 3. 配置前端
 
 ```bash
-cd frontend/apos-frontend
+cd frontend
 
 # 安装依赖
 npm install
@@ -150,6 +150,15 @@ MAX_HISTORY_LENGTH=100
 GET /api/health
 ```
 
+响应示例：
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-06-29T12:00:00Z",
+  "version": "1.0.0"
+}
+```
+
 ### 聊天接口
 
 ```http
@@ -158,7 +167,15 @@ Content-Type: application/json
 
 {
   "message": "用户消息",
-  "session_id": "会话ID"
+  "session_id": "会话ID"  // 可选，不提供则自动创建新会话
+}
+
+响应示例：
+{
+  "success": true,
+  "response": "AI生成的回复内容",
+  "session_id": "当前会话ID",
+  "history_id": "消息历史记录ID"
 }
 ```
 
@@ -168,16 +185,68 @@ Content-Type: application/json
 GET /api/tools
 ```
 
+响应示例：
+```json
+{
+  "success": true,
+  "tools": [
+    {
+      "name": "web_search",
+      "description": "网络搜索工具",
+      "parameters": {"query": "搜索关键词"}
+    },
+    {
+      "name": "calculator",
+      "description": "数学计算工具",
+      "parameters": {"expression": "数学表达式"}
+    }
+  ]
+}
+```
+
 ### 获取历史记录
 
 ```http
 GET /api/history/{session_id}
 ```
 
+路径参数：
+- `session_id`: 会话ID（必填）
+
+响应示例：
+```json
+{
+  "success": true,
+  "history": [
+    {
+      "role": "user",
+      "content": "你好",
+      "timestamp": "2025-06-29T10:00:00Z"
+    },
+    {
+      "role": "assistant",
+      "content": "您好！有什么可以帮助您的吗？",
+      "timestamp": "2025-06-29T10:00:02Z"
+    }
+  ]
+}
+```
+
 ### 清除历史记录
 
 ```http
 DELETE /api/clear/{session_id}
+```
+
+路径参数：
+- `session_id`: 会话ID（必填）
+
+响应示例：
+```json
+{
+  "success": true,
+  "message": "历史记录已清除"
+}
 ```
 
 ## 🧪 测试
