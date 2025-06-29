@@ -114,11 +114,22 @@ class ToolManager:
         return tools_list
 
     def get_tools_description(self) -> str:
-        """获取工具描述文本"""
+        """获取工具描述文本，包含名称、描述和参数说明"""
         descriptions = []
+        available_tools = self.get_available_tools()
 
-        for tool_name, description in self.tool_descriptions.items():
-            descriptions.append(f"- {tool_name}: {description}")
+        for tool_info in available_tools:
+            tool_name = tool_info['name']
+            description = tool_info['description']
+            parameters = tool_info['parameters']
+            
+            # 格式化参数说明
+            param_str = []
+            for param, details in parameters.items():
+                param_str.append(f"{param}: {details}")
+            params_description = "，".join(param_str) if param_str else "无"
+            
+            descriptions.append(f"- {tool_name}: {description} (调用参数: {params_description})")
 
         return "\n".join(descriptions)
 

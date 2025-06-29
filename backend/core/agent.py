@@ -11,6 +11,10 @@ from core.llm_client import LLMClient
 from core.history_manager import HistoryManager
 from tools.tool_manager import ToolManager
 from utils.logger import get_logger
+from .prompts import get_system_prompt
+import platform
+import getpass
+from datetime import datetime
 
 class APOSAgent:
     """APOS Agent 主类"""
@@ -107,46 +111,14 @@ class APOSAgent:
     
     def _build_system_prompt(self) -> str:
         """构建系统提示词"""
+        system_info = {
+            'system_version': platform.version(),
+            'username': getpass.getuser(),
+            'current_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
         tools_info = self.tool_manager.get_tools_description()
         
-        return f"""你是 APOS，一个通用型 AI Agent，能够帮助用户完成各种复杂任务。
-
-你的工作流程：
-1. 理解用户的需求
-2. 分析需要使用哪些工具来完成任务
-3. 按步骤调用工具来完成任务
-4. 每次只能调用一个工具
-5. 根据工具执行结果决定下一步操作
-6. 完成任务后给出总结
-
-工具调用格式：
-当你需要调用工具时，请使用以下 XML 格式：
-<tool_call>
-{{
-    "tool": "工具名称",
-    "parameters": {{
-        "参数名": "参数值"
-    }}
-}}
-</tool_call>
-
-任务完成格式：
-当你已经完成所有任务，请使用以下 XML 格式提交最终答案：
-<final_answer>
-最终答案
-</final_answer>
-
-可用工具：
-{tools_info}
-
-重要规则：
-- 每次对话只能调用一个工具或提交最终答案。
-- 必须严格按照 XML 格式调用工具或提交最终答案。
-- 工具调用后，我会将执行结果返回给你。请根据结果判断任务是否完成。
-- 如果任务已完成，请使用 <final_answer> 标签提交最终答案。
-- 如果任务未完成，你可以继续调用工具。
-
-请根据用户的需求，逐步使用工具来完成任务。"""
+        return get_system_prompt(tools_info, system_info)
     
     def _extract_tool_call(self, response: str) -> Dict[str, Any]:
         """从响应中提取工具调用"""
