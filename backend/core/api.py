@@ -103,6 +103,65 @@ def clear_history(session_id):
             'error': f'清除历史记录失败: {str(e)}'
         }), 500
 
+@api_bp.route('/sessions', methods=['GET'])
+def list_sessions():
+    """列出所有会话"""
+    try:
+        logger.info("📋 获取会话列表请求")
+        
+        session_ids = agent.history_manager.get_all_sessions()
+        sessions = []
+        for session_id in session_ids:
+            info = agent.history_manager.get_session_info(session_id)
+            sessions.append(info)
+        
+        return jsonify({
+            'sessions': sessions
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ 获取会话列表错误: {str(e)}")
+        return jsonify({
+            'error': f'获取会话列表失败: {str(e)}'
+        }), 500
+
+@api_bp.route('/sessions', methods=['POST'])
+def create_session():
+    """创建新会话"""
+    try:
+        logger.info("✨ 创建新会话请求")
+        
+        session_id = agent.history_manager.create_new_session()
+        
+        return jsonify({
+            'session_id': session_id,
+            'message': '会话创建成功'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ 创建会话错误: {str(e)}")
+        return jsonify({
+            'error': f'创建会话失败: {str(e)}'
+        }), 500
+
+@api_bp.route('/sessions/<session_id>', methods=['DELETE'])
+def delete_session(session_id):
+    """删除会话"""
+    try:
+        logger.info(f"🗑️ 删除会话请求: {session_id}")
+        
+        agent.history_manager.delete_session(session_id)
+        
+        return jsonify({
+            'message': f'会话 {session_id} 已删除'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ 删除会话错误: {str(e)}")
+        return jsonify({
+            'error': f'删除会话失败: {str(e)}'
+        }), 500
+
 @api_bp.route('/tools', methods=['GET'])
 def get_tools():
     """获取可用工具列表接口"""

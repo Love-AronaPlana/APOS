@@ -1,24 +1,136 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { ScrollArea } from '@/components/ui/scroll-area.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Separator } from '@/components/ui/separator.jsx'
-import { Send, Bot, User, Trash2, Settings, Zap, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { Send, Bot, User, Trash2, Settings, Zap, Clock, CheckCircle, AlertCircle, Plus } from 'lucide-react'
 import './App.css'
 
 function App() {
     const [messages, setMessages] = useState([])
     const [inputMessage, setInputMessage] = useState('')
     const [isLoading, setIsLoading] = useState(false)
-    const [sessionId] = useState('default')
+    const [sessionId, setSessionId] = useState('')
+    const [sessions, setSessions] = useState([])
+    const [toolConfirmations, setToolConfirmations] = useState([])
     const [tools, setTools] = useState([])
 
-    // 获取可用工具列表
+    // 获取可用工具列表和会话列表
     useEffect(() => {
         fetchTools()
+        fetchSessions()
     }, [])
+
+    // 当sessionId变化时加载历史记录
+    useEffect(() => {
+        if (sessionId) {
+            fetchHistory(sessionId)
+        } else {
+            setMessages([])
+        }
+    }, [sessionId])
+
+    const fetchSessions = async () => {
+        try {
+            const response = await fetch('http://localhost:8880/api/sessions')
+            const data = await response.json()
+            setSessions(data.sessions || [])
+
+            // 如果没有选中的会话且存在会话列表，默认选择第一个
+            if (data.sessions && data.sessions.length > 0 && !sessionId) {
+                setSessionId(data.sessions[0].session_id)
+            } else if (data.sessions && data.sessions.length === 0) {
+                // 如果没有会话，创建一个新会话
+                createNewSession()
+            }
+        } catch (error) {
+            console.error('获取会话列表失败:', error)
+        }
+    }
+
+    // 解析响应内容提取工具调用和最终答案
+    const parseResponse = (content) => {
+        const toolCallMatch = content.match(/<tool_call>(.*?)<\/tool_call>/s);
+        const finalAnswerMatch = content.match(/<final_answer>(.*?)<\/final_answer>/s);
+
+        if (toolCallMatch) {
+            try {
+                const toolCall = JSON.parse(toolCallMatch[1]);
+                return {
+                    type: 'tool_call',
+                    tool_call: toolCall,
+                    content: content.replace(/<\/?tool_call>/g, '').trim()
+                };
+            } catch (e) {
+                return { type: 'text', content };
+            }
+        } else if (finalAnswerMatch) {
+            return {
+                type: 'final_answer',
+                content: finalAnswerMatch[1].trim()
+            };
+        }
+        return { type: 'text', content };
+    };
+
+    const fetchHistory = async (sessionId) => {
+        try {
+            const response = await fetch(`http://localhost:8880/api/history/${sessionId}`)
+            const data = await response.json()
+            const parsedHistory = (data.history || []).map(message => {
+                const parsed = parseResponse(message.content);
+                return {
+                    ...message,
+                    content: parsed.content,
+                    tool_call: parsed.tool_call
+                };
+            });
+            setMessages(parsedHistory)
+        } catch (error) {
+            console.error('获取历史记录失败:', error)
+        }
+    }
+
+    const createNewSession = async () => {
+        try {
+            const response = await fetch('http://localhost:8880/api/sessions', {
+                method: 'POST'
+            })
+            const data = await response.json()
+            setSessionId(data.session_id)
+            fetchSessions() // 刷新会话列表
+        } catch (error) {
+            console.error('创建新会话失败:', error)
+        }
+    }
+
+    const deleteSession = async (sessionIdToDelete) => {
+        if (!confirm('确定要删除这个会话吗？')) return
+
+        try {
+            await fetch(`http://localhost:8880/api/sessions/${sessionIdToDelete}`, {
+                method: 'DELETE'
+            })
+
+            // 如果删除的是当前会话，需要切换到其他会话或创建新会话
+            if (sessionIdToDelete === sessionId) {
+                const response = await fetch('http://localhost:8880/api/sessions')
+                const data = await response.json()
+
+                if (data.sessions && data.sessions.length > 0) {
+                    setSessionId(data.sessions[0].session_id)
+                } else {
+                    createNewSession()
+                }
+            }
+
+            fetchSessions() // 刷新会话列表
+        } catch (error) {
+            console.error('删除会话失败:', error)
+        }
+    }
 
     const fetchTools = async () => {
         try {
@@ -60,13 +172,41 @@ function App() {
                     type: 'tool_confirmation'
                 };
             } else {
+                // 解析响应内容提取工具调用和最终答案
+                const parseResponse = (content) => {
+                    const toolCallMatch = content.match(/<tool_call>(.*?)<\/tool_call>/s);
+                    const finalAnswerMatch = content.match(/<final_answer>(.*?)<\/final_answer>/s);
+
+                    if (toolCallMatch) {
+                        try {
+                            const toolCall = JSON.parse(toolCallMatch[1]);
+                            return {
+                                type: 'tool_call',
+                                tool_call: toolCall,
+                                content: content.replace(/<\/?tool_call>/g, '').trim()
+                            };
+                        } catch (e) {
+                            return { type: 'text', content };
+                        }
+                    } else if (finalAnswerMatch) {
+                        return {
+                            type: 'final_answer',
+                            content: finalAnswerMatch[1].trim()
+                        };
+                    }
+                    return { type: 'text', content };
+                };
+
+                const parsed = parseResponse(data.response);
+
                 assistantMessage = {
                     id: Date.now() + 1,
                     role: 'assistant',
-                    content: data.response,
+                    content: parsed.content,
                     timestamp: new Date().toLocaleTimeString(),
                     iterations: data.iterations,
-                    status: data.status
+                    status: data.status,
+                    tool_call: parsed.tool_call
                 };
             }
 
@@ -115,7 +255,8 @@ function App() {
                 },
                 body: JSON.stringify({
                     message: inputMessage,
-                    session_id: sessionId
+                    session_id: sessionId,
+                    tool_confirmations: toolConfirmations
                 })
             })
 
@@ -125,26 +266,28 @@ function App() {
                 throw new Error(data.error)
             }
 
+            const parsed = parseResponse(data.response);
             let assistantMessage;
             if (data.status === 'waiting_for_confirmation') {
                 // 创建需要确认的工具调用消息
                 assistantMessage = {
                     id: Date.now() + 1,
                     role: 'assistant',
-                    content: data.response,
+                    content: parsed.content,
                     timestamp: new Date().toLocaleTimeString(),
                     status: data.status,
-                    tool_call: data.tool_call,
+                    tool_call: data.tool_call || parsed.tool_call,
                     type: 'tool_confirmation'
                 };
             } else {
                 assistantMessage = {
                     id: Date.now() + 1,
                     role: 'assistant',
-                    content: data.response,
+                    content: parsed.content,
                     timestamp: new Date().toLocaleTimeString(),
                     iterations: data.iterations,
-                    status: data.status
+                    status: data.status,
+                    tool_call: parsed.tool_call
                 };
             }
 
@@ -163,9 +306,10 @@ function App() {
     }
 
     const clearHistory = async () => {
+        if (!sessionId) return
         try {
             await fetch(`http://localhost:8880/api/clear/${sessionId}`, {
-                method: 'DELETE'
+                method: 'POST'
             })
             setMessages([])
         } catch (error) {
@@ -231,7 +375,7 @@ function App() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1">
                     {/* 工具面板 */}
-                    <div className="lg:col-span-1">
+                    <div className="lg:col-span-1 space-y-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-lg flex items-center">
@@ -247,6 +391,43 @@ function App() {
                                                 <div className="font-medium text-sm">{tool.name}</div>
                                                 <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                                                     {tool.description}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-lg flex items-center">
+                                    <Clock className="w-5 h-5 mr-2" />
+                                    对话历史
+                                </CardTitle>
+                                <Button variant="ghost" size="icon" onClick={createNewSession}>
+                                    <Plus className="w-4 h-4" />
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-64">
+                                    <div className="space-y-2">
+                                        {sessions.map((session) => (
+                                            <div key={session.session_id} className={`p-3 border rounded-lg cursor-pointer transition-colors ${session.session_id === sessionId ? 'bg-primary/10 border-primary' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`} onClick={() => setSessionId(session.session_id)}>
+                                                <div className="flex justify-between items-start">
+                                                    <div className="font-medium text-sm truncate max-w-[150px]">{session.session_id.substring(0, 8)}...</div>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:text-red-500" onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteSession(session.session_id);
+                                                    }}>
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-1">
+                                                    {new Date(session.created_at).toLocaleString()}
+                                                </div>
+                                                <div className="text-xs text-slate-500">
+                                                    {session.message_count} 条消息
                                                 </div>
                                             </div>
                                         ))}

@@ -98,6 +98,7 @@ class APOSAgent:
                             'tool_call': tool_call
                         }
 
+                else:
                     # 非MCP工具直接执行
                     tool_result = self.tool_manager.execute_tool(
                         tool_call['tool'], 
