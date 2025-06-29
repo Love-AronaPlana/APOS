@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify
 from core.agent import APOSAgent
 from utils.logger import get_logger
 import traceback
+import json
 
 # 创建蓝图
 api_bp = Blueprint('api', __name__)
@@ -120,5 +121,51 @@ def get_tools():
         logger.error(f"❌ 获取工具列表错误: {str(e)}")
         return jsonify({
             'error': f'获取工具列表失败: {str(e)}'
+        }), 500
+
+@api_bp.route('/confirm-tool', methods=['POST'])
+def confirm_tool():
+    """处理用户对工具调用的确认"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id', 'default')
+        tool_call = data.get('tool_call')
+        decision = data.get('decision')  # 'allow' 或 'deny'
+        
+        if not tool_call or not decision:
+            return jsonify({'error': '缺少tool_call或decision参数'}), 400
+        
+        logger.info(f"📋 用户确认工具调用: {decision} - {tool_call['tool']}")
+        
+        if decision == 'allow':
+            # 执行工具
+            tool_result = agent.tool_manager.execute_tool(
+                tool_call['tool'],
+                tool_call['parameters']
+            )
+            
+            # 添加工具结果到历史
+            agent.history_manager.add_message(
+                session_id,
+                'system',
+                f"工具执行结果: {json.dumps(tool_result, ensure_ascii=False)}"
+            )
+        else:
+            # 用户拒绝，添加拒绝信息到历史
+            agent.history_manager.add_message(
+                session_id,
+                'system',
+                f"用户拒绝调用工具: {tool_call['tool']}"
+            )
+            tool_result = {'success': False, 'error': '用户拒绝调用工具'}
+        
+        # 继续处理对话
+        response = agent.process_message('', session_id)  # 传入空消息继续处理
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.error(f"❌ 工具确认错误: {str(e)}")
+        return jsonify({
+            'error': f'处理工具确认失败: {str(e)}'
         }), 500
 

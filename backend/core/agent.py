@@ -24,6 +24,7 @@ class APOSAgent:
         self.llm_client = LLMClient()
         self.history_manager = HistoryManager()
         self.tool_manager = ToolManager()
+        self.session_iterations = {}
         
         self.logger.info("🤖 APOS Agent 初始化完成")
     
@@ -33,18 +34,23 @@ class APOSAgent:
         
         try:
             # 添加用户消息到历史记录
-            self.history_manager.add_message(session_id, 'user', user_message)
+            if user_message and user_message.strip():
+                self.history_manager.add_message(session_id, 'user', user_message)
             
             # 构建系统提示词
             system_prompt = self._build_system_prompt()
             
             # 开始对话循环
             max_iterations = 20  # 最大迭代次数
-            iteration = 0
+            # 初始化迭代次数 - 新消息重置计数，工具确认继续计数
+            if user_message and user_message.strip():
+                self.session_iterations[session_id] = 0
+            iteration = self.session_iterations.get(session_id, 0)
             final_response = None
             
             while iteration < max_iterations:
                 iteration += 1
+                self.session_iterations[session_id] = iteration
                 self.logger.info(f"🔄 第 {iteration} 次迭代")
                 
                 # 获取历史记录
@@ -68,22 +74,46 @@ class APOSAgent:
                 if tool_call:
                     self.logger.info(f"🔧 检测到工具调用: {tool_call['tool']}")
                     
-                    # 执行工具
+                    # 检查是否是MCP工具
+                    # 检查是否是MCP工具
+                    is_mcp_tool = tool_call['tool'].startswith('mcp_') or hasattr(self.tool_manager.tools[tool_call['tool']], 'is_mcp')
+
+                    if is_mcp_tool:
+                        # 需要用户确认，将工具调用请求存储到会话状态
+                        self.history_manager.add_message(
+                            session_id, 
+                            'system', 
+                            json.dumps({
+                                'type': 'tool_confirmation_required',
+                                'tool': tool_call['tool'],
+                                'parameters': tool_call['parameters']
+                            }, ensure_ascii=False)
+                        )
+
+                        # 返回需要确认的状态
+                        return {
+                            'response': '需要用户确认工具调用',
+                            'session_id': session_id,
+                            'status': 'waiting_for_confirmation',
+                            'tool_call': tool_call
+                        }
+
+                    # 非MCP工具直接执行
                     tool_result = self.tool_manager.execute_tool(
                         tool_call['tool'], 
                         tool_call['parameters']
                     )
-                    
+
                     # 添加工具结果到历史记录
                     self.history_manager.add_message(
                         session_id, 
                         'system', 
                         f"工具执行结果: {json.dumps(tool_result, ensure_ascii=False)}"
                     )
-                    
+
                     # 继续下一次迭代
                     continue
-                
+
                 # 如果没有工具调用，也没有最终答案，则直接跳出
                 self.logger.warning("🤔 未检测到工具调用或最终答案，提前结束任务。")
                 final_response = response # 将当前响应作为最终响应
@@ -94,6 +124,8 @@ class APOSAgent:
                 self.logger.warning("🤔 达到最大迭代次数，但未找到最终答案。")
                 final_response = self.history_manager.get_last_assistant_message(session_id)
             
+            # 任务完成，重置迭代计数
+            self.session_iterations[session_id] = 0
             return {
                 'response': final_response,
                 'session_id': session_id,

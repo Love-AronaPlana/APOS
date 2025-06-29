@@ -16,7 +16,7 @@ def get_system_prompt(tools_info: str, system_info: dict) -> str:
 6. 完成任务后给出总结
 
 工具调用格式：
-当你需要调用工具时，请使用以下 XML 格式：
+当你需要调用工具时，可以在<tool_call>标签外添加自然语言解释，工具调用本身请使用以下 XML 格式：
 <tool_call>
 {{
     "tool": "工具名称",
@@ -37,7 +37,7 @@ def get_system_prompt(tools_info: str, system_info: dict) -> str:
 
 重要规则：
 - 每次对话只能调用一个工具或提交最终答案。
-- 必须严格按照 XML 格式调用工具或提交最终答案。
+- 工具调用和最终答案必须包含在对应的XML标签内，标签外可以添加自然语言解释。
 - 工具调用后，我会将执行结果返回给你。请根据结果判断任务是否完成。
 - 如果任务已完成，请使用 <final_answer> 标签提交最终答案。
 - 如果任务未完成，你可以继续调用工具。
